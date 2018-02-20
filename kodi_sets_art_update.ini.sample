@@ -1,19 +1,28 @@
 #Configure the following variables
 
 #tvdb API key
+
 api=
+
 #kodi IP/port (if not 80) eg 192.168.1.1:8080
+
 kodiip=
+
 #kodi HTTP username
+
 usern=
+
 #kodi HTTP password
+
 passw=
 
 #local location to download images files. mostly likely the mounted share.
 #eg "/mnt/artwork", which is on a remote server
+
 downloaddir=
 
 #mapping used by Kodi. this is how Kodi will find the files.
 #eg: "smb://192.169.10.1/collectionart/"
 #not directly referenced by the host running the script, just assigned via API
+
 imagelocation=
