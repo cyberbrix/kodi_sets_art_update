@@ -76,11 +76,16 @@ echo "Kodi API connectivity issue"
 exit 1
 fi
 
+#detect total number of movie sets
+totalsets=`curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "method":"VideoLibrary.GetMovieSets"}' "http://$usern:$passw@$kodiip/jsonrpc" | jq -r '.result.limits.total'`
 
+allmovies=`curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "method":"VideoLibrary.GetMovieSets","params": { "properties": ["title","art"]}}' "http://$usern:$passw@$kodiip/jsonrpc" | jq -r '.result.sets[] | "\(.title)|\(.setid)|\(.art.fanart)|\(.art.poster)"'`
 
-curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "method":"VideoLibrary.GetMovieSets","params": { "properties": ["title","art"]}}' "http://$usern:$passw@$kodiip/jsonrpc" | jq -r '.result.sets[] | "\(.title)|\(.setid)|\(.art.fanart)|\(.art.poster)"' | while IFS='|' read a b c d
+globalchange=0
+while IFS='|' read a b c d
 
-do 
+do
+
 collnameraw="$a"
 collname=`echo "$collnameraw" | sed 's/[<>:"/\|?*]//'`
 movieset="$b"
@@ -98,13 +103,8 @@ totalmovies=`curl -s --header 'Content-Type: application/json' --data-binary '{"
 #checking movie count. skipping collections with 1 movie
 if [ $totalmovies -lt 2 ]
 then
-#echo "$collname has less than 2 movies"
-#echo ""
 continue
 fi
-
-#echo "Processing $collname - $totalmovies movies"
-
 
 #Getting collection poster and fanart file paths
 read A B <<< `curl -sG --data-urlencode "page=1" --data-urlencode "language=en-US" --data-urlencode "api_key=44fca1785541f7e5132635539343740f" --data-urlencode "query=$collnameraw" https://api.themoviedb.org/3/search/collection | jq -r --arg collect "$collnameraw" '.results[] | select (.name==$collect) | .backdrop_path, .poster_path'`
@@ -115,22 +115,24 @@ filefanart=$downloaddir$collname"-fanart.jpg"
 
 #check if proper poster - file can still be missing, but set correctly in Kodi
 posterfix=0
-if [ "$currposter" != "$properposter"  ]
+if [ "$currposter" != "$properposter" ]
 then
 echo "$collname poster mismatch"
-echo "CURRENT: $currposter"
-echo "PROPER: $properposter"
+#echo "CURRENT: $currposter"
+#echo "PROPER: $properposter"
 posterfix=1
+globalchange=1
 fi
 
 #check if proper fanart - file can still be missing, but set correctly in Kodi
 fanartfix=0
-if [ "$currfanart" != "$properfanart"  ]
+if [ "$currfanart" != "$properfanart" ]
 then
 echo "$collname fanart mismatch"
-echo "CURRENT: $currfanart"
-echo "PROPER: $properfanart"
+#echo "CURRENT: $currfanart"
+#echo "PROPER: $properfanart"
 fanartfix=1
+globalchange=1
 fi
 
 #checking if current poster file exists
@@ -138,14 +140,14 @@ if [ ! -f "$fileposter" ] && [ $B != "null" ]
 then
 #attempt to download file
 echo "Poster missing, downloading $fileposter"
-wget -qO "$fileposter" "$baseimage""$B" 
+wget -qO "$fileposter" "$baseimage""$B"
 #if fails, deletes file
 if [ $? -ne 0 ]
 then
 echo "poster: $baseimage$B wget error"
 rm -f "$fileposter"
 else
-echo "poster: $baseimage$B wget success"
+#echo "poster: $baseimage$B wget success"
 sleep 5
 fi
 fi
@@ -163,16 +165,15 @@ then
 echo "fanart: $baseimage$A wget error"
 rm -f "$filefanart"
 else
-echo "fanart: $baseimage$A wget success"
+#echo "fanart: $baseimage$A wget success"
 sleep 5
 fi
 fi
-
 #Set poster of collection
 if [ -f "$fileposter" ] && [ $posterfix -eq 1 ]
 then
 #set poster
-echo "Setting poster - $properposter"
+#echo "Setting poster - $properposter"
 postersetresult=$(curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "params":{"setid":'$movieset', "art": {"poster": "'"$properposter"'"}}, "method": "VideoLibrary.SetMovieSetDetails"}' "http://$usern:$passw@$kodiip/jsonrpc" | grep -iq "OK" ; echo $?)
 if [ $postersetresult -eq 0 ]
 then
@@ -187,7 +188,7 @@ fi
 if [ -f "$filefanart" ] && [ $fanartfix -eq 1 ]
 then
 #set fanart
-echo "Setting fanart - $properfanart"
+#echo "Setting fanart - $properfanart"
 fanartsetresult=$(curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "params":{"setid":'$movieset', "art": {"fanart": "'"$properfanart"'"}}, "method": "VideoLibrary.SetMovieSetDetails"}' "http://$usern:$passw@$kodiip/jsonrpc" | grep -iq "OK" ; echo $?)
 if [ $fanartsetresult -eq 0 ]
 then
@@ -197,8 +198,11 @@ echo "$collname fanart not set"
 fi
 fi
 
+done <<< "$allmovies"
 
-done
-
+if [ $globalchange -eq 0 ]
+then
+echo "No movie set art changes"
+fi
 
 exit 0
