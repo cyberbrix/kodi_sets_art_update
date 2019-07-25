@@ -79,7 +79,19 @@ fi
 #detect total number of movie sets
 totalsets=`curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "method":"VideoLibrary.GetMovieSets"}' "http://$usern:$passw@$kodiip/jsonrpc" | jq -r '.result.limits.total'`
 
+#list all movies
 allmovies=`curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "method":"VideoLibrary.GetMovieSets","params": { "properties": ["title","art"]}}' "http://$usern:$passw@$kodiip/jsonrpc" | jq -r '.result.sets[] | "\(.title)|\(.setid)|\(.art.fanart)|\(.art.poster)"'`
+
+#List all existing folderart
+filelist=$(mktemp XXXXXXXX.tmp 2>&1)
+tempfilestat=$?
+
+if [ $tempfilestat -eq 0 ]
+then
+ls -1 $downloaddir*.jpg | sed "s/${downloaddir//\//\\/}//g" > $filelist
+else
+echo "unable to create temp file"
+fi
 
 globalchange=0
 while IFS='|' read a b c d
@@ -198,11 +210,38 @@ echo "$collname fanart not set"
 fi
 fi
 
+#Remove existing art from temp list
+
+
+if [ $tempfilestat -eq 0 ]
+then
+sed -i "/^$collname-poster.jpg$/d;/^$collname-fanart.jpg$/d" $filelist
+fi
+
 done <<< "$allmovies"
 
 if [ $globalchange -eq 0 ]
 then
 echo "No movie set art changes"
 fi
+
+# Listing unused files
+if [ $tempfilestat -eq 0 ]
+then
+
+#removing excepted art from list
+IFS=';'
+for item in $artexception
+do
+sed -i "/$item/d" $filelist
+done
+
+
+echo ""
+echo "******Extra artwork files*****"
+cat $filelist
+rm  $filelist
+fi
+
 
 exit 0

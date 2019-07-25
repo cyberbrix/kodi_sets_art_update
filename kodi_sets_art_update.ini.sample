@@ -26,3 +26,6 @@ downloaddir=
 #not directly referenced by the host running the script, just assigned via API
 
 imagelocation=
+
+#exception artwork. will not be deleted. separate with semicolon. if none, leave as zero
+artexception=0
