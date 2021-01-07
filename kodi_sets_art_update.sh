@@ -98,42 +98,52 @@ while IFS='|' read a b c d
 
 do
 
-collnameraw="$a"
-collname=`echo "$collnameraw" | sed 's/[<>:"/\|?*]//'`
-movieset="$b"
-fanart="$c"
-poster="$d"
+  collnameraw="$a"
+  collname=`echo "$collnameraw" | sed 's/[<>:"/\|?*]//'`
+  movieset="$b"
+  fanart="$c"
+  poster="$d"
 
-currposter=`echo $poster | urldecode | sed 's/^image:\/\///; s/\/$//'`
-currfanart=`echo "$fanart" | urldecode | sed 's/^image:\/\///; s/\/$//'`
+  currposter=`echo $poster | urldecode | sed 's/^image:\/\///; s/\/$//'`
+  currfanart=`echo "$fanart" | urldecode | sed 's/^image:\/\///; s/\/$//'`
 
-properposter=$imagelocation$collname"-poster.jpg"
-properfanart=$imagelocation$collname"-fanart.jpg"
+  properposter=$imagelocation$collname"-poster.jpg"
+  properfanart=$imagelocation$collname"-fanart.jpg"
 
-totalmovies=`curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "method":"VideoLibrary.GetMovieSetDetails","params":{"setid": '$movieset'}}' "http://$usern:$passw@$kodiip/jsonrpc" | jq -r '.result.setdetails.limits.total'`
+  totalmovies=`curl -s --header 'Content-Type: application/json' --data-binary '{"id": 1, "jsonrpc": "2.0", "method":"VideoLibrary.GetMovieSetDetails","params":{"setid": '$movieset'}}' "http://$usern:$passw@$kodiip/jsonrpc" | jq -r '.result.setdetails.limits.total'`
 
-#checking movie count. skipping collections with 1 movie
-if [ $totalmovies -lt 2 ]
-then
-continue
-fi
 
-#Getting collection poster and fanart file paths
-read A B <<< `curl -sG --data-urlencode "page=1" --data-urlencode "language=en-US" --data-urlencode "api_key=44fca1785541f7e5132635539343740f" --data-urlencode "query=$collnameraw" https://api.themoviedb.org/3/search/collection | jq -r --arg collect "$collnameraw" '.results[] | select (.name==$collect) | .backdrop_path, .poster_path'`
+  if ! [[ "$totalmovies" =~ ^[0-9]+$ ]]
+  then
+    echo "$collname movies count not found"
+    continue
+  fi
 
-#assign file system file name
-fileposter=$downloaddir$collname"-poster.jpg"
-filefanart=$downloaddir$collname"-fanart.jpg"
+  #checking movie count. skipping collections with 1 movie
+  if [ $totalmovies -lt 2 ]
+  then
+    continue
+  fi
 
-#check if proper poster - file can still be missing, but set correctly in Kodi
-posterfix=0
-if [ "$currposter" != "$properposter" ]
-then
-echo "$collname poster mismatch"
-#echo "CURRENT: $currposter"
-#echo "PROPER: $properposter"
-posterfix=1
-globalchange=1
+  #Getting collection poster and fanart file paths
+  setinfo=`curl -sG --data-urlencode "page=1" --data-urlencode "language=en-US" --data-urlencode "api_key=44fca1785541f7e5132635539343740f" --data-urlencode "query=$collnameraw" https://api.themoviedb.org/3/search/collection | jq -r --arg collect "$collnameraw" '.results[] | select (.name==$collect)'`
+  #read A B <<< `curl -sG --data-urlencode "page=1" --data-urlencode "language=en-US" --data-urlencode "api_key=44fca1785541f7e5132635539343740f" --data-urlencode "query=$collnameraw" https://api.themoviedb.org/3/search/collection | jq -r --arg collect "$collnameraw" '.results[] | select (.name==$collect) | .backdrop_path, .poster_path'`
+  A=`echo $setinfo  | jq -r .backdrop_path` 
+  B=`echo $setinfo  | jq -r .poster_path`
+
+  #assign file system file name
+  fileposter=$downloaddir$collname"-poster.jpg"
+  filefanart=$downloaddir$collname"-fanart.jpg"
+
+  #check if proper poster - file can still be missing, but set correctly in Kodi
+  posterfix=0
+  if [ "$currposter" != "$properposter" ]
+  then
+    echo "$collname poster mismatch"
+    #echo "CURRENT: $currposter"
+    #echo "PROPER: $properposter"
+    posterfix=1
+    globalchange=1
 fi
 
 #check if proper fanart - file can still be missing, but set correctly in Kodi
@@ -148,7 +158,7 @@ globalchange=1
 fi
 
 #checking if current poster file exists
-if [ ! -f "$fileposter" ] && [ $B != "null" ]
+if [ ! -f "$fileposter" ] && [ "$B" != "null" ]
 then
 #attempt to download file
 echo "Poster missing, downloading $fileposter"
